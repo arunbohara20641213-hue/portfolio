@@ -5,13 +5,41 @@ import { LineWipe, ScrambleText, StaggerWords } from './TextAnimations';
 
 export default function Contact() {
   const [sent, setSent] = useState(false);
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState(null);
   const [form, setForm] = useState({ name: '', email: '', message: '' });
 
   const handleChange = (e) => setForm({ ...form, [e.target.name]: e.target.value });
 
-  const handleSubmit = (e) => {
+  const handleSubmit = async (e) => {
     e.preventDefault();
-    setSent(true);
+    setLoading(true);
+    setError(null);
+
+    try {
+      const apiUrl = import.meta.env.VITE_API_URL || 'http://localhost:5000';
+      const response = await fetch(`${apiUrl}/api/send-email`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(form),
+      });
+
+      const data = await response.json();
+
+      if (!response.ok) {
+        throw new Error(data.error || 'Failed to send email');
+      }
+
+      setSent(true);
+      setForm({ name: '', email: '', message: '' });
+    } catch (err) {
+      setError(err.message || 'An error occurred. Please try again.');
+      console.error('Email submission error:', err);
+    } finally {
+      setLoading(false);
+    }
   };
 
   const fields = [
@@ -85,12 +113,35 @@ export default function Contact() {
                   text="Thank you for reaching out. A response will follow if the matter is worth pursuing."
                   tag="p"
                   className="byline"
-                  style={{ lineHeight: 1.8, display: 'block' }}
+                  style={{ lineHeight: 1.8, display: 'block', marginBottom: '2rem' }}
                   delay={0.4}
                 />
+                <button
+                  onClick={() => {
+                    setSent(false);
+                    setForm({ name: '', email: '', message: '' });
+                  }}
+                  className="press-btn"
+                >
+                  Send Another Message
+                </button>
               </div>
             ) : (
               <form onSubmit={handleSubmit} style={{ display: 'flex', flexDirection: 'column', gap: '2rem' }}>
+                {error && (
+                  <motion.div
+                    initial={{ opacity: 0, y: -8 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    style={{
+                      padding: '1rem',
+                      backgroundColor: '#fee',
+                      borderLeft: '3px solid #c00',
+                      borderRadius: '4px',
+                    }}
+                  >
+                    <p style={{ color: '#c00', fontSize: '0.95rem', margin: 0 }}>Error: {error}</p>
+                  </motion.div>
+                )}
                 {fields.map((f, fi) => (
                   <motion.div
                     key={f.name}
@@ -108,6 +159,7 @@ export default function Contact() {
                       onChange={handleChange}
                       placeholder={f.placeholder}
                       required
+                      disabled={loading}
                     />
                   </motion.div>
                 ))}
@@ -126,6 +178,7 @@ export default function Contact() {
                     placeholder="What's on your mind?"
                     rows={4}
                     required
+                    disabled={loading}
                     style={{ resize: 'none' }}
                   />
                 </motion.div>
@@ -135,7 +188,9 @@ export default function Contact() {
                   viewport={{ once: true }}
                   transition={{ duration: 0.5, delay: 0.4 }}
                 >
-                  <button type="submit" className="press-btn">Transmit Message</button>
+                  <button type="submit" className="press-btn" disabled={loading}>
+                    {loading ? 'Sending...' : 'Transmit Message'}
+                  </button>
                 </motion.div>
               </form>
             )}
